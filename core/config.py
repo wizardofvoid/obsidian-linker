@@ -1,7 +1,6 @@
 from dotenv import load_dotenv
 import os
 import getpass
-from langchain_core.output_parsers import JsonOutputParser
 
 load_dotenv()
 
@@ -16,8 +15,6 @@ if not GROQ_API_KEYS:
 LLM_EXTRACTION = os.getenv("LLM_EXTRACTION", LLM_MODEL)
 LLM_VERIFICATION = os.getenv("LLM_VERIFICATION", LLM_MODEL)
 LLM_RELATIONSHIP = os.getenv("LLM_RELATIONSHIP", LLM_MODEL)
-
-parser = JsonOutputParser()
 
 print(f"Models loaded:")
 print(f"  Extraction:    {LLM_EXTRACTION}")

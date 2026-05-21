@@ -1,11 +1,8 @@
 import json
-from langchain_core.output_parsers import JsonOutputParser
-from core.state import AgentState
+from core.state import AgentState, ConceptExtractionOutput
 from core.utils import invoke_with_retry
 from core.config import LLM_EXTRACTION, LLM_VERIFICATION
 from core.prompts import prompt_concept_extraction, prompt_concept_verification
-
-parser = JsonOutputParser()
 
 def concept_extractor(state: AgentState):
     print("\n--- [Concept Extractor] ---")
@@ -14,15 +11,14 @@ def concept_extractor(state: AgentState):
     for note in state.get("new_notes", []):
         try: 
             print(f"Extracting raw concepts from: {note['title']}...")
-            extracted_raw = invoke_with_retry(prompt_concept_extraction, LLM_EXTRACTION, parser, {
-                "text": note["content"],
-                "format_instructions": parser.get_format_instructions()
+            extracted_output = invoke_with_retry(prompt_concept_extraction, LLM_EXTRACTION, ConceptExtractionOutput, {
+                "text": note["content"]
             })
-            verified_list = extracted_raw if isinstance(extracted_raw, list) else extracted_raw.get("concepts", [])
 
-            for concept in verified_list:
-                concept["source_note"] = note["title"]
-                all_extracted_concepts.append(concept)
+            for concept in extracted_output.concepts:
+                concept_dict = concept.model_dump()
+                concept_dict["source_note"] = note["title"]
+                all_extracted_concepts.append(concept_dict)
                 
         except Exception as e:
             print(f"Failed to extract concepts from '{note['title']}': {e}")
@@ -43,16 +39,15 @@ def concept_verifier(state: AgentState):
                 
             print(f"Verifying concepts for: {note['title']}...")
             concepts_json = json.dumps(note_raw_concepts)
-            verified_raw = invoke_with_retry(prompt_concept_verification, LLM_VERIFICATION, parser, {
+            verified_output = invoke_with_retry(prompt_concept_verification, LLM_VERIFICATION, ConceptExtractionOutput, {
                 "text": note["content"], 
-                "concepts": concepts_json,
-                "format_instructions": parser.get_format_instructions()
+                "concepts": concepts_json
             })
-            verified_list = verified_raw if isinstance(verified_raw, list) else verified_raw.get("concepts", [])
 
-            for concept in verified_list:
-                concept["source_note"] = note["title"]
-                all_verified_concepts.append(concept)
+            for concept in verified_output.concepts:
+                concept_dict = concept.model_dump()
+                concept_dict["source_note"] = note["title"]
+                all_verified_concepts.append(concept_dict)
                 
         except Exception as e:
             print(f"Failed to verify concepts from '{note['title']}': {e}")
