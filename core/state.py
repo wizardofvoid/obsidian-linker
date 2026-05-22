@@ -34,10 +34,7 @@ class AgentState(TypedDict):
     new_concepts: List[dict]
     raw_links: List[dict]
     links: List[dict]
-    quality_score: float
-    retry_count: int
     dir: str
-    retry_reason: Optional[List[str]]
     cache_path: str
     file_hashes: dict
     raw_tags_by_note: dict

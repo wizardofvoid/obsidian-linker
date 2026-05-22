@@ -13,7 +13,7 @@ def relationship_extractor(state: AgentState):
     
     if not new_concepts:
         print("No new concepts extracted. Skipping relationship extraction.")
-        return {"raw_links": [], "retry_count": state.get("retry_count", 0) + 1}
+        return {"raw_links": []}
     
     try:
         # Load FAISS index
@@ -57,10 +57,10 @@ def relationship_extractor(state: AgentState):
         
         relations_list = [link.model_dump() for link in extracted_output.links]
         print(f"Total raw cross-note relationships extracted: {len(relations_list)}")
-        return {"raw_links": relations_list, "retry_count": state.get("retry_count", 0) + 1}
+        return {"raw_links": relations_list}
     except Exception as e:
         print(f"Failed to extract cross-note relationships: {e}")
-        return {"raw_links": [], "retry_count": state.get("retry_count", 0) + 1}
+        return {"raw_links": []}
 
 def relationship_verifier(state: AgentState):
     print("\n--- [Relationship Verifier] ---")
@@ -82,8 +82,36 @@ def relationship_verifier(state: AgentState):
         })
         
         relations_list = [link.model_dump() for link in verified_output.links]
-        print(f"Total verified cross-note relationships: {len(relations_list)}")
-        return {"links": state.get("links", []) + relations_list}
+        
+        # Structural filtering
+        note_titles = {note["title"] for note in state.get("notes", [])}
+        concept_to_note = {c["concept_name"]: c["source_note"] for c in concepts}
+        valid_links = []
+        prevented = 0
+        
+        for link in relations_list:
+            source_concept = link.get("source")
+            target_concept = link.get("target")
+            
+            from_note = link.get("from_note") or concept_to_note.get(source_concept)
+            to_note = link.get("to_note") or concept_to_note.get(target_concept)
+            
+            if not from_note or not to_note:
+                prevented += 1
+                continue
+            if from_note not in note_titles or to_note not in note_titles:
+                prevented += 1
+                continue
+            if from_note == to_note:
+                prevented += 1
+                continue
+                
+            link["from_note"] = from_note
+            link["to_note"] = to_note
+            valid_links.append(link)
+            
+        print(f"Total verified cross-note relationships: {len(valid_links)} (prevented {prevented} invalid links)")
+        return {"links": state.get("links", []) + valid_links}
     except Exception as e:
         print(f"Failed to verify relationships: {e}")
         return {"links": state.get("links", [])}

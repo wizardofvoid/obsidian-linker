@@ -158,4 +158,21 @@ def link_writer(state: AgentState):
 def summary_reporter(state: AgentState):
     print("\n--- [Summary Reporter] ---")
     print("Done! Links created:", len(state.get("links", [])))
+    
+    # Save back to cache
+    cache_path = state.get("cache_path")
+    if cache_path:
+        cache_data = {
+            "files": {title: {"hash": file_hash} for title, file_hash in state.get("file_hashes", {}).items()},
+            "concepts": state.get("concepts", []),
+            "links": state.get("links", []),
+            "tags": state.get("tags_by_note", {})
+        }
+        try:
+            with open(cache_path, "w", encoding="utf-8") as f:
+                json.dump(cache_data, f, indent=2)
+            print(f"Saved cache to {cache_path}")
+        except Exception as e:
+            print(f"Warning: Failed to save cache: {e}")
+            
     return {}
