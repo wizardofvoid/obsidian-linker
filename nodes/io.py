@@ -4,8 +4,10 @@ import hashlib
 from core.state import AgentState
 
 def get_core_hash(content: str) -> str:
-    """Returns an MD5 hash of the note content, ignoring the Related Links section."""
+    """Returns an MD5 hash of the note content, ignoring Related Links and Tags sections."""
     parts = content.split("\n## Related Links")
+    core_content = parts[0]
+    parts = core_content.split("\n## Tags")
     core_content = parts[0].rstrip()
     return hashlib.md5(core_content.encode('utf-8')).hexdigest()
 
@@ -30,6 +32,7 @@ def vault_reader(state: AgentState):
     cached_files = cache.get("files", {})
     all_cached_concepts = cache.get("concepts", [])
     all_cached_links = cache.get("links", [])
+    cached_tags = cache.get("tags", {})
     
     notes = []
     new_notes = []
@@ -58,12 +61,13 @@ def vault_reader(state: AgentState):
     
     retained_concepts = [c for c in all_cached_concepts if c["source_note"] in valid_titles]
     retained_links = [l for l in all_cached_links if l.get("from_note") in valid_titles and l.get("to_note") in valid_titles]
+    retained_tags = {k: v for k, v in cached_tags.items() if k in valid_titles}
 
     print(f"\n--- [Vault Reader] ---")
     print(f"Found {len(notes)} notes in vault.")
     print(f"Notes needing processing: {len(new_notes)}")
-    if retained_concepts or retained_links:
-        print(f"Loaded {len(retained_concepts)} cached concepts and {len(retained_links)} cached links.")
+    if retained_concepts or retained_links or retained_tags:
+        print(f"Loaded {len(retained_concepts)} cached concepts, {len(retained_links)} cached links, and {len(retained_tags)} cached tags.")
     
     return {
         "notes": notes, 
@@ -72,7 +76,9 @@ def vault_reader(state: AgentState):
         "cache_path": str(cache_path),
         "file_hashes": current_hashes,
         "concepts": retained_concepts,
-        "links": retained_links
+        "links": retained_links,
+        "tags_by_note": retained_tags,
+        "raw_tags_by_note": {}
     }
 
 def link_writer(state: AgentState):
@@ -92,7 +98,12 @@ def link_writer(state: AgentState):
             target_title = to_note.replace(".md", "")
             links_by_source[from_note].add(target_title)
             
-    for note_title, targets in links_by_source.items():
+    tags_by_note = state.get("tags_by_note", {})
+
+    # Gather all notes that need to be updated with links OR tags
+    all_notes_to_update = set(links_by_source.keys()).union(tags_by_note.keys())
+
+    for note_title in all_notes_to_update:
         file_path_str = note_to_path.get(note_title)
         original_content = note_to_content.get(note_title)
         
@@ -102,11 +113,26 @@ def link_writer(state: AgentState):
         file_path = Path(file_path_str)
         
         parts = original_content.split("\n## Related Links")
+        base_content = parts[0]
+        parts = base_content.split("\n## Tags")
         base_content = parts[0].rstrip()
         
-        sorted_targets = sorted(list(targets))
-        links_block = "\n".join(f"- [[{target}]]" for target in sorted_targets)
-        new_content = f"{base_content}\n\n## Related Links\n{links_block}\n"
+        new_content = base_content
+        
+        # Add tags if they exist
+        note_tags = tags_by_note.get(note_title)
+        if note_tags:
+            tags_block = " ".join(note_tags)
+            new_content += f"\n\n## Tags\n{tags_block}"
+
+        # Add links if they exist
+        targets = links_by_source.get(note_title)
+        if targets:
+            sorted_targets = sorted(list(targets))
+            links_block = "\n".join(f"- [[{target}]]" for target in sorted_targets)
+            new_content += f"\n\n## Related Links\n{links_block}"
+        
+        new_content += "\n"
         
         if new_content == original_content:
             continue
@@ -115,7 +141,13 @@ def link_writer(state: AgentState):
         try:
             temp_path.write_text(new_content, encoding="utf-8")
             temp_path.replace(file_path)
-            print(f"Successfully wrote {len(targets)} links to {note_title}")
+            
+            updates = []
+            if targets:
+                updates.append(f"{len(targets)} links")
+            if note_tags:
+                updates.append(f"{len(note_tags)} tags")
+            print(f"Successfully wrote {' and '.join(updates)} to {note_title}")
         except Exception as e:
             if temp_path.exists():
                 temp_path.unlink()

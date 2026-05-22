@@ -1,27 +1,29 @@
 from langchain_core.prompts import ChatPromptTemplate
 
 prompt_concept_extraction = ChatPromptTemplate.from_messages([
-    ("system", "You are an expert knowledge extraction system. Analyze the provided text and extract concepts. Focus strictly on reasoning and accuracy."),
+    ("system", "You are an expert knowledge extraction system. Analyze the provided text and extract concepts as well as global tags. Focus strictly on reasoning and accuracy."),
     ("user", """Analyze the following text and extract all important concepts, topics, technologies, methods, and entities.
-For each extracted concept provide the required fields in the structure.
+Also generate 3-5 global Obsidian-style tags (prefixed with '#') that categorize the overall note.
 
 Rules:
 - Extract only the top 5-8 most significant concepts.
 - Only extract concepts explicitly mentioned or strongly implied.
 - Avoid duplicates.
 - Keep explanations concise.
-- CRITICAL INSTRUCTION: You must properly nest your output. Generate a single object containing a 'concepts' key, which maps to a valid JSON array of objects. Do not break the array syntax.
+- Generate highly relevant tags for the 'tags' array (e.g. '#technology', '#data-science'). Do not use namespaces, just simple hashtags.
+- CRITICAL INSTRUCTION: You must properly nest your output. Generate a single object containing a 'concepts' key (array of objects) and a 'tags' key (array of strings). Do not break the array syntax.
 
 TEXT: {text}""")
 ])
 
 prompt_concept_verification = ChatPromptTemplate.from_messages([
-    ("system", "You are a verification system. Clean and verify the extracted concepts. Focus purely on semantic accuracy."),
-    ("user", """Analyze the provided concepts extracted from the text below. Clean and verify them by:
-1. Removing any incorrect concepts that are not supported by the text.
-2. Removing duplicate or highly redundant concepts.
+    ("system", "You are a verification system. Clean and verify the extracted concepts and tags. Focus purely on semantic accuracy."),
+    ("user", """Analyze the provided concepts and tags extracted from the text below. Clean and verify them by:
+1. Removing any incorrect concepts or tags that are not supported by the text.
+2. Removing duplicate or highly redundant concepts and tags.
 3. Merging concepts that refer to the exact same entity/topic.
 4. Refining descriptions to be highly accurate and clear based on the text.
+5. Ensuring all tags are properly formatted with a '#' prefix and no spaces.
 
 TEXT:
 {text}

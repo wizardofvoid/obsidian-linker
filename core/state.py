@@ -13,6 +13,7 @@ class ConceptModel(BaseModel):
 
 class ConceptExtractionOutput(BaseModel):
     concepts: List[ConceptModel]
+    tags: List[str] = Field(default_factory=list, description="3-5 global Obsidian-style tags representing the entire note (e.g., '#machine-learning', '#python').")
 
 class RelationshipModel(BaseModel):
     source: str = Field(description="The name of the source concept.")
@@ -39,3 +40,5 @@ class AgentState(TypedDict):
     retry_reason: Optional[List[str]]
     cache_path: str
     file_hashes: dict
+    raw_tags_by_note: dict
+    tags_by_note: dict

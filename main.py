@@ -40,18 +40,26 @@ app = graph.compile()
 
 # --- Run it ---
 if __name__ == "__main__":
-    result = app.invoke({
-        "notes": [], 
-        "new_notes": [],
-        "raw_concepts": [],
-        "concepts": [], 
-        "new_concepts": [],
-        "raw_links": [],
-        "links": [],
-        "quality_score": 0.0, 
-        "retry_count": 0,
-        "dir": "",
-        "retry_reason": None,
-        "cache_path": "",
-        "file_mtimes": {}
-    })
+    import asyncio
+    
+    async def main():
+        result = await app.ainvoke({
+            "notes": [], 
+            "new_notes": [],
+            "raw_concepts": [],
+            "concepts": [], 
+            "new_concepts": [],
+            "raw_links": [],
+            "links": [],
+            "quality_score": 0.0, 
+            "retry_count": 0,
+            "dir": "",
+            "retry_reason": None,
+            "cache_path": "",
+            "file_hashes": {},
+            "raw_tags_by_note": {},
+            "tags_by_note": {}
+        })
+        return result
+        
+    asyncio.run(main())

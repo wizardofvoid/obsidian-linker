@@ -57,7 +57,8 @@ def quality_checker(state: AgentState):
         cache_data = {
             "files": {title: {"hash": file_hash} for title, file_hash in state.get("file_hashes", {}).items()},
             "concepts": state.get("concepts", []),
-            "links": valid_links
+            "links": valid_links,
+            "tags": state.get("tags_by_note", {})
         }
         try:
             with open(cache_path, "w", encoding="utf-8") as f:
