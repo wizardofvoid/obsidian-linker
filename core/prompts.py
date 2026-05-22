@@ -28,7 +28,9 @@ prompt_concept_verification = ChatPromptTemplate.from_messages([
 TEXT:
 {text}
 CONCEPTS:
-{concepts}""")
+{concepts}
+TAGS:
+{tags}""")
 ])
 
 prompt_relation = ChatPromptTemplate.from_messages([

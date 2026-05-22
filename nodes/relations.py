@@ -22,19 +22,24 @@ def relationship_extractor(state: AgentState):
         
         retrieved_concepts = []
         if faiss_path.exists():
-            vectorstore = FAISS.load_local(str(faiss_path), embeddings, allow_dangerous_deserialization=True)
-            for new_concept in new_concepts:
-                query = f"{new_concept['concept_name']}: {new_concept['explanation']}"
-                # Retrieve top 10 relevant concepts per new concept
-                results = vectorstore.similarity_search(query, k=10)
-                
-                for doc in results:
-                    name = doc.metadata.get("name")
-                    note = doc.metadata.get("note")
-                    # Find the full concept dict in all_concepts
-                    match = next((c for c in all_concepts if c["concept_name"] == name and c["source_note"] == note), None)
-                    if match and match not in retrieved_concepts and match not in new_concepts:
-                        retrieved_concepts.append(match)
+            try:
+                vectorstore = FAISS.load_local(str(faiss_path), embeddings, allow_dangerous_deserialization=True)
+                for new_concept in new_concepts:
+                    query = f"{new_concept['concept_name']}: {new_concept['explanation']}"
+                    # Retrieve top 10 relevant concepts per new concept
+                    results = vectorstore.similarity_search(query, k=10)
+                    
+                    for doc in results:
+                        name = doc.metadata.get("name")
+                        note = doc.metadata.get("note")
+                        # Find the full concept dict in all_concepts
+                        match = next((c for c in all_concepts if c["concept_name"] == name and c["source_note"] == note), None)
+                        if match and match not in retrieved_concepts and match not in new_concepts:
+                            retrieved_concepts.append(match)
+            except Exception as embed_e:
+                print(f"FAISS search failed (possibly API limit): {embed_e}")
+                print("Falling back to all existing concepts.")
+                retrieved_concepts = [c for c in all_concepts if c not in new_concepts]
         else:
             print("No FAISS index found. Falling back to all existing concepts.")
             retrieved_concepts = [c for c in all_concepts if c not in new_concepts]

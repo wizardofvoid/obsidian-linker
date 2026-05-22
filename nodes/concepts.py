@@ -105,22 +105,25 @@ async def concept_verifier(state: AgentState):
                 if (i + 1) % 10 == 0 or (i + 1) == len(documents):
                     print(f"  Indexed {i+1}/{len(documents)}...")
 
-        if faiss_path.exists():
-            try:
-                vectorstore = FAISS.load_local(str(faiss_path), embeddings, allow_dangerous_deserialization=True)
-                add_safely(vectorstore, docs)
-                vectorstore.save_local(str(faiss_path))
-            except Exception as e:
-                print(f"Failed to load existing FAISS index. Rebuilding: {e}")
+        try:
+            if faiss_path.exists():
+                try:
+                    vectorstore = FAISS.load_local(str(faiss_path), embeddings, allow_dangerous_deserialization=True)
+                    add_safely(vectorstore, docs)
+                    vectorstore.save_local(str(faiss_path))
+                except Exception as e:
+                    print(f"Failed to load existing FAISS index. Rebuilding: {e}")
+                    vectorstore = FAISS.from_documents([docs[0]], embeddings)
+                    if len(docs) > 1:
+                        add_safely(vectorstore, docs[1:])
+                    vectorstore.save_local(str(faiss_path))
+            else:
                 vectorstore = FAISS.from_documents([docs[0]], embeddings)
                 if len(docs) > 1:
                     add_safely(vectorstore, docs[1:])
                 vectorstore.save_local(str(faiss_path))
-        else:
-            vectorstore = FAISS.from_documents([docs[0]], embeddings)
-            if len(docs) > 1:
-                add_safely(vectorstore, docs[1:])
-            vectorstore.save_local(str(faiss_path))
+        except Exception as embed_e:
+            print(f"Failed to index concepts into FAISS (possibly API limit): {embed_e}")
             
     print(f"Total verified concepts from new notes: {len(all_verified_concepts)}")
     return {
