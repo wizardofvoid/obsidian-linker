@@ -38,4 +38,4 @@ class AgentState(TypedDict):
     dir: str
     retry_reason: Optional[List[str]]
     cache_path: str
-    file_mtimes: dict
+    file_hashes: dict

@@ -1,6 +1,13 @@
 from pathlib import Path
 import json
+import hashlib
 from core.state import AgentState
+
+def get_core_hash(content: str) -> str:
+    """Returns an MD5 hash of the note content, ignoring the Related Links section."""
+    parts = content.split("\n## Related Links")
+    core_content = parts[0].rstrip()
+    return hashlib.md5(core_content.encode('utf-8')).hexdigest()
 
 def vault_reader(state: AgentState):
     directory_path = state.get("dir", "")
@@ -26,23 +33,25 @@ def vault_reader(state: AgentState):
     
     notes = []
     new_notes = []
-    current_mtimes = {}
+    current_hashes = {}
     current_titles = set()
     
     for file in directory.rglob("*.md"):
         title = file.name
         current_titles.add(title)
-        mtime = file.stat().st_mtime
-        current_mtimes[title] = mtime
+        
+        content = file.read_text(encoding="utf-8")
+        content_hash = get_core_hash(content)
+        current_hashes[title] = content_hash
         
         note_obj = {
             "title": title, 
             "path": str(file.resolve()),
-            "content": file.read_text(encoding="utf-8")
+            "content": content
         }
         notes.append(note_obj)
         
-        if title not in cached_files or cached_files[title].get("mtime") != mtime:
+        if title not in cached_files or cached_files[title].get("hash") != content_hash:
             new_notes.append(note_obj)
             
     valid_titles = current_titles - {n["title"] for n in new_notes}
@@ -61,7 +70,7 @@ def vault_reader(state: AgentState):
         "new_notes": new_notes,
         "dir": str(directory_path),
         "cache_path": str(cache_path),
-        "file_mtimes": current_mtimes,
+        "file_hashes": current_hashes,
         "concepts": retained_concepts,
         "links": retained_links
     }

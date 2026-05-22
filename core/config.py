@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 import os
 import getpass
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 load_dotenv()
 
@@ -10,6 +11,13 @@ GROQ_API_KEYS = [v.strip() for k, v in os.environ.items() if "GROQ_API_KEY" in k
 if not GROQ_API_KEYS:
     key = getpass.getpass("Enter your Groq API key: ")
     GROQ_API_KEYS.append(key)
+
+# Initialize Embeddings
+google_api_key = os.getenv("GOOGLE_API_KEY")
+if not google_api_key:
+    google_api_key = getpass.getpass("Enter your Google API key for embeddings: ")
+    
+embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-2", google_api_key=google_api_key)
 
 # --- Per-stage LLM configuration ---
 LLM_EXTRACTION = os.getenv("LLM_EXTRACTION", LLM_MODEL)

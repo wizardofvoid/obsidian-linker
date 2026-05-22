@@ -55,7 +55,7 @@ def quality_checker(state: AgentState):
     cache_path = state.get("cache_path")
     if cache_path:
         cache_data = {
-            "files": {title: {"mtime": mtime} for title, mtime in state.get("file_mtimes", {}).items()},
+            "files": {title: {"hash": file_hash} for title, file_hash in state.get("file_hashes", {}).items()},
             "concepts": state.get("concepts", []),
             "links": valid_links
         }

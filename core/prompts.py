@@ -10,6 +10,7 @@ Rules:
 - Only extract concepts explicitly mentioned or strongly implied.
 - Avoid duplicates.
 - Keep explanations concise.
+- CRITICAL INSTRUCTION: You must properly nest your output. Generate a single object containing a 'concepts' key, which maps to a valid JSON array of objects. Do not break the array syntax.
 
 TEXT: {text}""")
 ])
