@@ -33,31 +33,9 @@ class RotatingGoogleEmbeddings(Embeddings):
         return GoogleGenerativeAIEmbeddings(model=self.model_name, google_api_key=key)
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        global current_google_key_index
-        max_retries = 5
-        base_delay = 2.0
-        
-        for attempt in range(max_retries):
-            try:
-                emb = self._get_embedding_instance()
-                return emb.embed_documents(texts)
-            except Exception as e:
-                err_msg = str(e).lower()
-                if "rate limit" in err_msg or "429" in err_msg or "resource_exhausted" in err_msg:
-                    if len(GOOGLE_API_KEYS) > 1:
-                        print(f"  Google API rate limit hit on Key {current_google_key_index + 1}. Switching to next key...")
-                        current_google_key_index = (current_google_key_index + 1) % len(GOOGLE_API_KEYS)
-                        if attempt < max_retries - 1:
-                            continue
-                    else:
-                        print("  Google API rate limit hit. No alternative keys to switch to.")
-                
-                if attempt == max_retries - 1:
-                    raise
-                    
-                delay = base_delay * (2 ** attempt)
-                print(f"  Embedding failed (Attempt {attempt+1}): {e}. Retrying in {delay}s...")
-                time.sleep(delay)
+        # Call embed_query for each text to guarantee we get exactly one embedding per text,
+        # avoiding the langchain-google-genai batch embedding bug in this environment.
+        return [self.embed_query(text) for text in texts]
 
     def embed_query(self, text: str) -> List[float]:
         global current_google_key_index

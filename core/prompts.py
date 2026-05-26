@@ -49,7 +49,8 @@ Rules:
 - ONLY extract relationships between concepts from DIFFERENT notes.
 - AT LEAST ONE concept in the relationship MUST be from the NEW CONCEPTS list.
 - Do NOT create relationships between concepts from the same note.
-- Focus on meaningful semantic connections.
+- **Strict Quality Threshold**: Focus on highly meaningful, direct, and significant semantic connections. Do NOT link concepts that only share a loose, generic, or trivial association (e.g. do not link every database just because they are 'databases'). The link must represent a true conceptual dependency, extension, or implementation choice.
+- **Evidence-Based**: The connection must be clearly supported by the concept explanations provided. In the `evidence` field, write a concise explanation showing exactly why the two concepts/notes are strongly related.
 
 NEW CONCEPTS:
 {new_concepts}
@@ -66,6 +67,7 @@ Verify each relationship:
 2. Remove duplicate relationships.
 3. Ensure the source and target concepts actually exist in the concepts list.
 4. Ensure the relationship type is semantically correct.
+5. **Strict Quality Control**: Reject any relationships that represent weak, trivial, or generic connections. Every kept relationship must warrant a direct Obsidian link between the two notes. If the link does not add strong cognitive value to the reader, remove it.
 
 CONCEPTS:
 {concepts}

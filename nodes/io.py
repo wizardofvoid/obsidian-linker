@@ -3,12 +3,42 @@ import json
 import hashlib
 from core.state import AgentState
 
+def strip_auto_sections(content: str) -> str:
+    """Safely extracts the core content of a markdown note, ignoring ## Tags and ## Related Links
+    sections that are at the root level (not inside code blocks)."""
+    lines = content.splitlines()
+    in_code_block = False
+    tags_start_idx = None
+    links_start_idx = None
+    
+    for i, line in enumerate(lines):
+        if line.strip().startswith("```"):
+            in_code_block = not in_code_block
+            
+        if not in_code_block:
+            rstrip_line = line.rstrip()
+            if rstrip_line == "## Tags":
+                if tags_start_idx is None:
+                    tags_start_idx = i
+            elif rstrip_line == "## Related Links":
+                if links_start_idx is None:
+                    links_start_idx = i
+                    
+    earliest_idx = None
+    if tags_start_idx is not None and links_start_idx is not None:
+        earliest_idx = min(tags_start_idx, links_start_idx)
+    elif tags_start_idx is not None:
+        earliest_idx = tags_start_idx
+    elif links_start_idx is not None:
+        earliest_idx = links_start_idx
+        
+    if earliest_idx is not None:
+        return "\n".join(lines[:earliest_idx]).rstrip()
+    return content.rstrip()
+
 def get_core_hash(content: str) -> str:
     """Returns an MD5 hash of the note content, ignoring Related Links and Tags sections."""
-    parts = content.split("\n## Related Links")
-    core_content = parts[0]
-    parts = core_content.split("\n## Tags")
-    core_content = parts[0].rstrip()
+    core_content = strip_auto_sections(content)
     return hashlib.md5(core_content.encode('utf-8')).hexdigest()
 
 def vault_reader(state: AgentState):
@@ -112,10 +142,7 @@ def link_writer(state: AgentState):
             
         file_path = Path(file_path_str)
         
-        parts = original_content.split("\n## Related Links")
-        base_content = parts[0]
-        parts = base_content.split("\n## Tags")
-        base_content = parts[0].rstrip()
+        base_content = strip_auto_sections(original_content)
         
         new_content = base_content
         

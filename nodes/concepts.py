@@ -99,28 +99,41 @@ async def concept_verifier(state: AgentState):
         
         print(f"Indexing {len(docs)} new concepts into FAISS...")
         
-        def add_safely(store, documents):
-            for i, d in enumerate(documents):
-                store.add_documents([d])
-                if (i + 1) % 10 == 0 or (i + 1) == len(documents):
-                    print(f"  Indexed {i+1}/{len(documents)}...")
+        def add_safely(store, documents, batch_size=20):
+            for i in range(0, len(documents), batch_size):
+                batch = documents[i : i + batch_size]
+                store.add_documents(batch)
+                print(f"  Indexed {min(i + batch_size, len(documents))}/{len(documents)}...")
 
         try:
             if faiss_path.exists():
                 try:
                     vectorstore = FAISS.load_local(str(faiss_path), embeddings, allow_dangerous_deserialization=True)
+                    
+                    # Delete stale concepts for modified notes to avoid duplicates and stale records
+                    new_notes_titles = {note["title"] for note in new_notes}
+                    ids_to_delete = [
+                        doc_id for doc_id, doc in vectorstore.docstore._dict.items()
+                        if doc.metadata.get("note") in new_notes_titles
+                    ]
+                    if ids_to_delete:
+                        print(f"Removing {len(ids_to_delete)} stale/duplicate concepts from FAISS index...")
+                        vectorstore.delete(ids_to_delete)
+                        
                     add_safely(vectorstore, docs)
                     vectorstore.save_local(str(faiss_path))
                 except Exception as e:
                     print(f"Failed to load existing FAISS index. Rebuilding: {e}")
-                    vectorstore = FAISS.from_documents([docs[0]], embeddings)
-                    if len(docs) > 1:
-                        add_safely(vectorstore, docs[1:])
+                    init_batch = docs[:20]
+                    vectorstore = FAISS.from_documents(init_batch, embeddings)
+                    if len(docs) > 20:
+                        add_safely(vectorstore, docs[20:])
                     vectorstore.save_local(str(faiss_path))
             else:
-                vectorstore = FAISS.from_documents([docs[0]], embeddings)
-                if len(docs) > 1:
-                    add_safely(vectorstore, docs[1:])
+                init_batch = docs[:20]
+                vectorstore = FAISS.from_documents(init_batch, embeddings)
+                if len(docs) > 20:
+                    add_safely(vectorstore, docs[20:])
                 vectorstore.save_local(str(faiss_path))
         except Exception as embed_e:
             print(f"Failed to index concepts into FAISS (possibly API limit): {embed_e}")
