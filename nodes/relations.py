@@ -187,7 +187,10 @@ def relationship_verifier(state: AgentState):
             valid_links.append(link)
             
         print(f"Total verified cross-note relationships: {len(valid_links)} (prevented {prevented} invalid links)")
-        return {"links": state.get("links", []) + valid_links}
+        return {
+            "links": state.get("links", []) + valid_links,
+            "new_links": valid_links
+        }
     except Exception as e:
         print(f"Failed to verify relationships: {e}")
-        return {"links": state.get("links", [])}
+        return {"links": state.get("links", []), "new_links": []}

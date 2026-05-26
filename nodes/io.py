@@ -130,8 +130,14 @@ def link_writer(state: AgentState):
             
     tags_by_note = state.get("tags_by_note", {})
 
-    # Gather all notes that need to be updated with links OR tags
+    new_notes_titles = {note["title"] for note in state.get("new_notes", [])}
+    new_links = state.get("new_links", [])
+    new_link_sources = {link["from_note"] for link in new_links if link.get("from_note")}
+    allowed_updates = new_notes_titles.union(new_link_sources)
+
+    # Gather all notes that need to be updated with links OR tags, filtered to only those modified/updated in this run
     all_notes_to_update = set(links_by_source.keys()).union(tags_by_note.keys())
+    all_notes_to_update = all_notes_to_update.intersection(allowed_updates)
 
     for note_title in all_notes_to_update:
         file_path_str = note_to_path.get(note_title)
