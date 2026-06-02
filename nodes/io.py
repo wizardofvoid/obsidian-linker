@@ -1,40 +1,36 @@
 from pathlib import Path
 import json
 import hashlib
+import re
 from core.state import AgentState
 
 def strip_auto_sections(content: str) -> str:
-    """Safely extracts the core content of a markdown note, ignoring ## Tags and ## Related Links
-    sections that are at the root level (not inside code blocks)."""
+    """Safely extracts the core content of a markdown note, removing only the ## Tags and 
+    ## Related Links sections (and their contents up to the next root-level heading or EOF),
+    preserving any manually added content below them."""
     lines = content.splitlines()
     in_code_block = False
-    tags_start_idx = None
-    links_start_idx = None
+    filtered_lines = []
+    skip_mode = False
     
-    for i, line in enumerate(lines):
-        if line.strip().startswith("```"):
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("```"):
             in_code_block = not in_code_block
             
         if not in_code_block:
-            rstrip_line = line.rstrip()
-            if rstrip_line == "## Tags":
-                if tags_start_idx is None:
-                    tags_start_idx = i
-            elif rstrip_line == "## Related Links":
-                if links_start_idx is None:
-                    links_start_idx = i
-                    
-    earliest_idx = None
-    if tags_start_idx is not None and links_start_idx is not None:
-        earliest_idx = min(tags_start_idx, links_start_idx)
-    elif tags_start_idx is not None:
-        earliest_idx = tags_start_idx
-    elif links_start_idx is not None:
-        earliest_idx = links_start_idx
-        
-    if earliest_idx is not None:
-        return "\n".join(lines[:earliest_idx]).rstrip()
-    return content.rstrip()
+            # Check if this line starts an auto-generated section
+            if stripped == "## Tags" or stripped == "## Related Links":
+                skip_mode = True
+                continue
+            # If in skip mode, check if we hit the next heading
+            elif skip_mode and re.match(r"^#+\s", stripped):
+                skip_mode = False
+                
+        if not skip_mode:
+            filtered_lines.append(line)
+            
+    return "\n".join(filtered_lines).rstrip()
 
 def get_core_hash(content: str) -> str:
     """Returns an MD5 hash of the note content, ignoring Related Links and Tags sections."""
@@ -125,7 +121,7 @@ def link_writer(state: AgentState):
         if from_note and to_note:
             if from_note not in links_by_source:
                 links_by_source[from_note] = set()
-            target_title = to_note.replace(".md", "")
+            target_title = to_note[:-3] if to_note.lower().endswith(".md") else to_note
             links_by_source[from_note].add(target_title)
             
     tags_by_note = state.get("tags_by_note", {})

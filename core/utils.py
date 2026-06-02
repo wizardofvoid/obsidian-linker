@@ -32,7 +32,7 @@ def invoke_with_retry(prompt, model_name, pydantic_schema, inputs, max_retries=N
     for attempt in range(max_retries):
         try:
             api_key = GROQ_API_KEYS[current_key_index]
-            llm = ChatGroq(groq_api_key=api_key, model=model_name, max_tokens=4096)
+            llm = ChatGroq(groq_api_key=api_key, model=model_name, max_tokens=1024)
             structured_llm = llm.with_structured_output(pydantic_schema)
             chain = prompt | structured_llm
             return chain.invoke(inputs)
@@ -68,7 +68,7 @@ async def async_invoke_with_retry(prompt, model_name, pydantic_schema, inputs, m
         key_used = current_key_index
         try:
             api_key = GROQ_API_KEYS[key_used]
-            llm = ChatGroq(groq_api_key=api_key, model=model_name, max_tokens=4096)
+            llm = ChatGroq(groq_api_key=api_key, model=model_name, max_tokens=1024)
             structured_llm = llm.with_structured_output(pydantic_schema)
             chain = prompt | structured_llm
             return await chain.ainvoke(inputs)

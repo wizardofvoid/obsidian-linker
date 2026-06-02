@@ -34,7 +34,21 @@ app = graph.compile()
 # --- Run it ---
 if __name__ == "__main__":
     import asyncio
+    import sys
+    import os
     
+    # Resolve directory from CLI arguments or environment variable
+    vault_dir = r"C:\Users\saraf\Documents\VOID"
+    if "--dir" in sys.argv:
+        try:
+            idx = sys.argv.index("--dir")
+            if idx + 1 < len(sys.argv):
+                vault_dir = sys.argv[idx + 1]
+        except ValueError:
+            pass
+    elif "OBSIDIAN_VAULT_DIR" in os.environ:
+        vault_dir = os.environ["OBSIDIAN_VAULT_DIR"]
+        
     async def main():
         result = await app.ainvoke({
             "notes": [], 
@@ -44,7 +58,7 @@ if __name__ == "__main__":
             "new_concepts": [],
             "raw_links": [],
             "links": [],
-            "dir": r"C:\Users\saraf\Documents\VOID",
+            "dir": vault_dir,
             "cache_path": "",
             "file_hashes": {},
             "raw_tags_by_note": {},
