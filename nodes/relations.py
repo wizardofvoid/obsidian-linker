@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
-from langchain_community.vectorstores import FAISS
+from langchain_community.vectorstores import Pinecone
+import os
 from core.state import AgentState, RelationshipExtractionOutput
 from core.utils import invoke_with_retry, minify_concepts
 from core.config import LLM_RELATIONSHIP, LLM_VERIFICATION, embeddings
@@ -23,15 +24,18 @@ def relationship_extractor(state: AgentState):
             return {"raw_links": []}
     
     try:
-        # Load FAISS index
-        directory_path = state.get("dir", "")
-        faiss_path = Path(directory_path) / ".linker_faiss_index"
+        # Load Pinecone index
+        pinecone_index_name = os.getenv("PINECONE_INDEX_NAME", "obsidian-brain")
+        from pinecone import Pinecone as PineconeClient
+        pc = PineconeClient(api_key=os.getenv("PINECONE_API_KEY"))
+        index = pc.Index(pinecone_index_name)
         
-        if not faiss_path.exists():
-            print("No FAISS index found. Skipping relationship extraction.")
-            return {"raw_links": []}
-            
-        vectorstore = FAISS.load_local(str(faiss_path), embeddings, allow_dangerous_deserialization=True)
+        vectorstore = Pinecone(
+            index=index,
+            embedding=embeddings,
+            namespace="obsidian",
+            text_key="text"
+        )
         
         # Group new concepts by their source note to process them note-by-note
         concepts_by_note = {}

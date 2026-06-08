@@ -1,8 +1,6 @@
 import json
 from pathlib import Path
 from langchain_core.documents import Document
-# pyrefly: ignore [missing-import]
-from langchain_community.vectorstores import FAISS
 from core.state import AgentState, ConceptExtractionOutput
 from core.utils import invoke_with_retry, abatch_invoke_with_retry
 from core.config import LLM_EXTRACTION, LLM_VERIFICATION, embeddings
@@ -97,46 +95,50 @@ async def concept_verifier(state: AgentState):
             ) for c in all_verified_concepts
         ]
         
-        print(f"Indexing {len(docs)} new concepts into FAISS...")
+        print(f"Indexing {len(docs)} new concepts into Pinecone...")
         
-        def add_safely(store, documents, batch_size=20):
-            for i in range(0, len(documents), batch_size):
-                batch = documents[i : i + batch_size]
-                store.add_documents(batch)
-                print(f"  Indexed {min(i + batch_size, len(documents))}/{len(documents)}...")
-
         try:
-            if faiss_path.exists():
-                try:
-                    vectorstore = FAISS.load_local(str(faiss_path), embeddings, allow_dangerous_deserialization=True)
-                    
-                    # Delete stale concepts for modified notes to avoid duplicates and stale records
-                    new_notes_titles = {note["title"] for note in new_notes}
-                    ids_to_delete = [
-                        doc_id for doc_id, doc in vectorstore.docstore._dict.items()
-                        if doc.metadata.get("note") in new_notes_titles
-                    ]
-                    if ids_to_delete:
-                        print(f"Removing {len(ids_to_delete)} stale/duplicate concepts from FAISS index...")
-                        vectorstore.delete(ids_to_delete)
-                        
-                    add_safely(vectorstore, docs)
-                    vectorstore.save_local(str(faiss_path))
-                except Exception as e:
-                    print(f"Failed to load existing FAISS index. Rebuilding: {e}")
-                    init_batch = docs[:20]
-                    vectorstore = FAISS.from_documents(init_batch, embeddings)
-                    if len(docs) > 20:
-                        add_safely(vectorstore, docs[20:])
-                    vectorstore.save_local(str(faiss_path))
-            else:
-                init_batch = docs[:20]
-                vectorstore = FAISS.from_documents(init_batch, embeddings)
-                if len(docs) > 20:
-                    add_safely(vectorstore, docs[20:])
-                vectorstore.save_local(str(faiss_path))
+            from pinecone import Pinecone as PineconeClient
+            import os
+            import uuid
+            
+            pc = PineconeClient(api_key=os.getenv("PINECONE_API_KEY"))
+            index = pc.Index(os.getenv("PINECONE_INDEX_NAME", "obsidian-brain"))
+            
+            # Delete stale concepts for modified notes
+            new_notes_titles = {note["title"] for note in new_notes}
+            if new_notes_titles:
+                print(f"Removing stale concepts for {len(new_notes_titles)} modified notes...")
+                for title in new_notes_titles:
+                    try:
+                        index.delete(filter={"note": title}, namespace="obsidian")
+                    except Exception as e:
+                        pass # It's okay if there are no stale concepts
+            
+            # Generate embeddings and Upsert
+            print("Generating embeddings for new concepts...")
+            vectors = []
+            for doc in docs:
+                # We should use batch embeddings if possible, but for simplicity here:
+                meta = doc.metadata.copy()
+                meta["text"] = doc.page_content
+                vectors.append((str(uuid.uuid4()), doc.page_content, meta))
+            
+            # Use embeddings.embed_documents for faster batching
+            texts_to_embed = [v[1] for v in vectors]
+            embeddings_list = embeddings.embed_documents(texts_to_embed)
+            
+            final_vectors = []
+            for i, emb in enumerate(embeddings_list):
+                final_vectors.append((vectors[i][0], emb, vectors[i][2]))
+            
+            for i in range(0, len(final_vectors), 50):
+                batch = final_vectors[i:i+50]
+                index.upsert(vectors=batch, namespace="obsidian")
+                print(f"  Indexed {min(i + 50, len(final_vectors))}/{len(final_vectors)}...")
+                
         except Exception as embed_e:
-            print(f"Failed to index concepts into FAISS (possibly API limit): {embed_e}")
+            print(f"Failed to index concepts into Pinecone: {embed_e}")
             
     print(f"Total verified concepts from new notes: {len(all_verified_concepts)}")
     return {
