@@ -8,3 +8,4 @@ langchain-pinecone
 pinecone-client
 neo4j
 python-dotenv
+langchain-google-genai
