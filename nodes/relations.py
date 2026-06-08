@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from langchain_community.vectorstores import Pinecone
+from langchain_pinecone import PineconeVectorStore
 import os
 from core.state import AgentState, RelationshipExtractionOutput
 from core.utils import invoke_with_retry, minify_concepts
@@ -30,7 +30,7 @@ def relationship_extractor(state: AgentState):
         pc = PineconeClient(api_key=os.getenv("PINECONE_API_KEY"))
         index = pc.Index(pinecone_index_name)
         
-        vectorstore = Pinecone(
+        vectorstore = PineconeVectorStore(
             index=index,
             embedding=embeddings,
             namespace="obsidian",
