@@ -61,6 +61,39 @@ def sync_vault(repo_url: str, token: str, vault_dir: Path) -> bool:
         print(f"Git sync failed: {e}")
         return False
 
+def push_vault(vault_dir: Path) -> bool:
+    git_dir = vault_dir / ".git"
+    if not git_dir.exists():
+        print("Not a git repository, skipping push.")
+        return False
+    try:
+        # Check if there are changes
+        status = subprocess.run(
+            ["git", "-C", str(vault_dir), "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        if not status.stdout.strip():
+            print("No changes to push.")
+            return True
+            
+        print("Changes detected. Committing and pushing to GitHub...")
+        # Configure temporary user
+        subprocess.run(["git", "-C", str(vault_dir), "config", "user.name", "Obsidian Linker Agent"], check=True)
+        subprocess.run(["git", "-C", str(vault_dir), "config", "user.email", "agent@obsidianlinker.com"], check=True)
+        
+        # Add, commit and push
+        subprocess.run(["git", "-C", str(vault_dir), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(vault_dir), "commit", "-m", "Auto-update links and concept cache [Render]"], check=True)
+        subprocess.run(["git", "-C", str(vault_dir), "push"], check=True)
+        print("Successfully pushed changes to GitHub.")
+        return True
+    except Exception as e:
+        print(f"Git push failed: {e}")
+        return False
+
+
 async def run_pipeline(vault_dir: str):
     await app.ainvoke({
         "notes": [], 
@@ -76,6 +109,7 @@ async def run_pipeline(vault_dir: str):
         "raw_tags_by_note": {},
         "tags_by_note": {}
     })
+    push_vault(Path(vault_dir))
 
 @fastapi_app.post("/sync")
 async def sync_endpoint(req: SyncRequest, background_tasks: BackgroundTasks):
