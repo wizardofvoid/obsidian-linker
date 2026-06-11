@@ -94,25 +94,42 @@ def push_vault(vault_dir: Path) -> bool:
         return False
 
 
+# Global state for task status tracking
+task_status = {"status": "idle", "error": None}
+
+
 async def run_pipeline(vault_dir: str):
-    await app.ainvoke({
-        "notes": [], 
-        "new_notes": [],
-        "raw_concepts": [],
-        "concepts": [], 
-        "new_concepts": [],
-        "raw_links": [],
-        "links": [],
-        "dir": vault_dir,
-        "cache_path": "",
-        "file_hashes": {},
-        "raw_tags_by_note": {},
-        "tags_by_note": {}
-    })
-    push_vault(Path(vault_dir))
+    global task_status
+    task_status["status"] = "running"
+    task_status["error"] = None
+    try:
+        await app.ainvoke({
+            "notes": [], 
+            "new_notes": [],
+            "raw_concepts": [],
+            "concepts": [], 
+            "new_concepts": [],
+            "raw_links": [],
+            "links": [],
+            "dir": vault_dir,
+            "cache_path": "",
+            "file_hashes": {},
+            "raw_tags_by_note": {},
+            "tags_by_note": {}
+        })
+        push_vault(Path(vault_dir))
+        task_status["status"] = "completed"
+    except Exception as e:
+        task_status["status"] = "failed"
+        task_status["error"] = str(e)
+        print(f"Pipeline failed: {e}")
+
 
 @fastapi_app.post("/sync")
 async def sync_endpoint(req: SyncRequest, background_tasks: BackgroundTasks):
+    global task_status
+    task_status = {"status": "running", "error": None}
+    
     vault_dir = Path("/tmp/ObsidianVault") if os.name != 'nt' else Path(os.environ.get("TEMP", "C:/temp")) / "ObsidianVault"
     
     # Use request body or fallback to environment variables
@@ -122,16 +139,23 @@ async def sync_endpoint(req: SyncRequest, background_tasks: BackgroundTasks):
     if repo_url:
         success = sync_vault(repo_url, token, vault_dir)
         if not success:
+            task_status = {"status": "failed", "error": "Failed to sync GitHub repository."}
             raise HTTPException(status_code=500, detail="Failed to sync GitHub repository.")
     else:
         # Fallback for local testing if no repo is provided
         vault_dir = Path(os.getenv("OBSIDIAN_VAULT_DIR", str(vault_dir)))
         if not vault_dir.exists():
+            task_status = {"status": "failed", "error": "No GitHub URL provided and local vault dir does not exist."}
             raise HTTPException(status_code=400, detail="No GitHub URL provided and local vault dir does not exist.")
 
     # Run the heavy LangGraph pipeline in the background so the HTTP request doesn't timeout
     background_tasks.add_task(run_pipeline, str(vault_dir))
     return {"status": "success", "message": "Obsidian sync and LangGraph extraction started in the background."}
+
+
+@fastapi_app.get("/status")
+async def status_endpoint():
+    return task_status
 
 if __name__ == "__main__":
     import uvicorn
