@@ -53,6 +53,7 @@ def sync_vault(repo_url: str, token: str, vault_dir: Path) -> tuple[bool, str]:
     git_dir = vault_dir / ".git"
     try:
         if vault_dir.exists() and git_dir.exists():
+            subprocess.run(["git", "-C", str(vault_dir), "remote", "set-url", "origin", auth_url], check=True)
             subprocess.run(["git", "-C", str(vault_dir), "reset", "--hard", "HEAD"], check=True)
             subprocess.run(["git", "-C", str(vault_dir), "clean", "-fd"], check=True)
             subprocess.run(["git", "-C", str(vault_dir), "pull"], check=True)
