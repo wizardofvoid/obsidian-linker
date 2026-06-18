@@ -44,22 +44,33 @@ class SyncRequest(BaseModel):
     github_url: str = None
     github_token: str = None
     
-def sync_vault(repo_url: str, token: str, vault_dir: Path) -> bool:
+def sync_vault(repo_url: str, token: str, vault_dir: Path) -> tuple[bool, str]:
     if not repo_url:
-        return False
+        return False, "repo_url is empty"
+    repo_url = repo_url.strip('"').strip("'")
     clean_repo_url = repo_url.replace("https://", "").replace("http://", "")
     auth_url = f"https://{token}@{clean_repo_url}" if token else f"https://{clean_repo_url}"
     git_dir = vault_dir / ".git"
     try:
         if vault_dir.exists() and git_dir.exists():
+            subprocess.run(["git", "-C", str(vault_dir), "reset", "--hard", "HEAD"], check=True)
+            subprocess.run(["git", "-C", str(vault_dir), "clean", "-fd"], check=True)
             subprocess.run(["git", "-C", str(vault_dir), "pull"], check=True)
         else:
+            import shutil
+            if vault_dir.exists():
+                shutil.rmtree(vault_dir)
             vault_dir.parent.mkdir(parents=True, exist_ok=True)
             subprocess.run(["git", "clone", auth_url, str(vault_dir)], check=True)
-        return True
+        return True, ""
+    except subprocess.CalledProcessError as e:
+        error_msg = f"Git command failed: {e.stderr if hasattr(e, 'stderr') and e.stderr else str(e)}"
+        print(error_msg)
+        return False, error_msg
     except Exception as e:
-        print(f"Git sync failed: {e}")
-        return False
+        error_msg = f"Git sync failed: {e}"
+        print(error_msg)
+        return False, error_msg
 
 def push_vault(vault_dir: Path) -> bool:
     git_dir = vault_dir / ".git"
@@ -137,10 +148,10 @@ async def sync_endpoint(req: SyncRequest, background_tasks: BackgroundTasks):
     token = req.github_token or os.getenv("GITHUB_TOKEN")
     
     if repo_url:
-        success = sync_vault(repo_url, token, vault_dir)
+        success, error_msg = sync_vault(repo_url, token, vault_dir)
         if not success:
-            task_status = {"status": "failed", "error": "Failed to sync GitHub repository."}
-            raise HTTPException(status_code=500, detail="Failed to sync GitHub repository.")
+            task_status = {"status": "failed", "error": f"Failed to sync GitHub repository: {error_msg}"}
+            raise HTTPException(status_code=500, detail=f"Failed to sync GitHub repository: {error_msg}")
     else:
         # Fallback for local testing if no repo is provided
         vault_dir = Path(os.getenv("OBSIDIAN_VAULT_DIR", str(vault_dir)))
