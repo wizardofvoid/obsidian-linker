@@ -46,6 +46,10 @@ def invoke_with_retry(prompt, model_name, pydantic_schema, inputs, max_retries=N
                         continue # Retry immediately with new key
                 else:
                     print("  Rate limit hit. No alternative keys to switch to.")
+            elif "failed to call a function" in err_msg or "tool_use_failed" in err_msg:
+                print(f"  Groq tool parsing failed (attempt {attempt + 1}). Retrying...")
+                if attempt < max_retries - 1:
+                    continue
                     
             if attempt == max_retries - 1:
                 raise  # Re-raise on final attempt
@@ -89,6 +93,10 @@ async def async_invoke_with_retry(prompt, model_name, pydantic_schema, inputs, m
                         continue # Retry immediately with new key
                 else:
                     print("  Rate limit hit. No alternative keys to switch to.")
+            elif "failed to call a function" in err_msg or "tool_use_failed" in err_msg:
+                print(f"  Groq tool parsing failed (attempt {attempt + 1}). Retrying...")
+                if attempt < max_retries - 1:
+                    continue
                     
             if attempt == max_retries - 1:
                 raise  # Re-raise on final attempt
